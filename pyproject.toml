@@ -1,0 +1,31 @@
+[project]
+name = "minor-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ananya Bansal", email = "bansalananya1675@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "instructor>=1.17.0",
+    "networkx>=3.6.1",
+    "numpy>=2.4.6",
+    "openai>=3.3.0",
+    "pydantic>=2.14.1",
+    "pygltflib>=1.16.5",
+    "pytest>=9.1.1",
+    "scikit-learn>=1.9.1",
+    "trimesh>=5.1.1",
+]
+
+[project.scripts]
+minor-project = "minor_project:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warehouse MAPF 3D Replay Viewer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+
+    <div id="ui-overlay">
+      <!-- Top header bar: Metrics and Info -->
+      <header class="top-bar">
+        <div class="metrics-tiles dark-panel interactive">
+          <div class="metric-tile">
+            <div class="metric-label">Repair Success</div>
+            <div class="metric-val" id="metric-success">98.0% <span class="metric-baseline" id="base-success">(vs 85.0%)</span></div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-label">Mean Recovery</div>
+            <div class="metric-val" id="metric-recovery">4.8 steps <span class="metric-baseline" id="base-recovery">(vs 7.4)</span></div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-label">Path Cost Δ</div>
+            <div class="metric-val" id="metric-cost">+3.2% <span class="metric-baseline" id="base-cost">(vs +8.9%)</span></div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-label">LLM / Cache</div>
+            <div class="metric-val" id="metric-llm">5 calls <span class="metric-baseline" id="base-llm">(1 hits)</span></div>
+          </div>
+        </div>
+
+        <div class="info-panel dark-panel interactive">
+          <div class="badge-row">
+            <span style="font-weight: 600;">Status</span>
+            <span class="fps-badge" id="fps-counter">60 FPS</span>
+          </div>
+          <div class="camera-hint">
+            <span>Cam:</span>
+            <span class="kbd-badge">1</span> Map
+            <span class="kbd-badge">2</span> Aisle
+            <span class="kbd-badge">3</span> Follow
+          </div>
+          <div class="toggle-wrapper" style="margin-top: 4px;">
+            <label class="switch">
+              <input type="checkbox" id="baseline-toggle">
+              <span class="slider-round"></span>
+            </label>
+            <span id="baseline-mode-label">Mode: LLM Guided</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Right Collapsible Incident Detail Panel -->
+      <aside id="incident-panel" class="dark-panel interactive hidden">
+        <div class="panel-header">
+          <span class="panel-title" id="incident-panel-title">Incident Details</span>
+          <button class="close-btn" id="incident-close-btn">&times;</button>
+        </div>
+
+        <div class="incident-row row-sentinel">
+          <div class="row-header">
+            <span class="status-dot blue"></span> Sentinel Detector
+          </div>
+          <div class="row-body" id="inc-sentinel-text">Detection info...</div>
+        </div>
+
+        <div class="incident-row row-cache">
+          <div class="row-header">
+            <span class="status-dot purple"></span> Strategy Cache
+          </div>
+          <div class="row-body" id="inc-cache-text">Cache lookup...</div>
+        </div>
+
+        <div class="incident-row row-dryrun">
+          <div class="row-header">
+            <span class="status-dot amber"></span> Dry Run Verification
+          </div>
+          <div class="row-body" id="inc-dryrun-text">Dry run results...</div>
+        </div>
+
+        <div class="incident-row row-llm">
+          <div class="row-header">
+            <span class="status-dot red"></span> LLM Strategist
+          </div>
+          <div class="row-body" id="inc-llm-text">LLM directive...</div>
+          <div class="code-snippet" id="inc-llm-directive"></div>
+        </div>
+
+        <div class="incident-row row-solver">
+          <div class="row-header">
+            <span class="status-dot green"></span> Solver Execution
+          </div>
+          <div class="row-body" id="inc-solver-text">Solver info...</div>
+        </div>
+
+        <div class="incident-row row-validator">
+          <div class="row-header">
+            <span class="status-dot green" id="inc-validator-dot"></span> Deterministic Validator
+          </div>
+          <div class="row-body" id="inc-validator-text">Validation attempts...</div>
+        </div>
+      </aside>
+
+      <!-- Bottom Playback & Timeline Controls -->
+      <footer class="bottom-bar">
+        <div class="timeline-container dark-panel interactive">
+          <div class="slider-wrapper">
+            <div class="timeline-ticks" id="timeline-ticks"></div>
+            <input type="range" id="step-slider" min="0" max="299" value="0" step="1" />
+          </div>
+
+          <div class="playback-controls">
+            <div class="controls-left">
+              <button class="ctrl-btn" id="play-pause-btn">&#9654; Play</button>
+              <button class="ctrl-btn" id="prev-inc-btn" title="Previous Incident (P)">&laquo; Prev Inc (P)</button>
+              <button class="ctrl-btn" id="next-inc-btn" title="Next Incident (N)">Next Inc (N) &raquo;</button>
+              <span class="step-label" id="step-indicator">Step: 0 / 300</span>
+            </div>
+
+            <div class="controls-right">
+              <span style="font-size: 12px; color: #94a3b8;">Speed:</span>
+              <button class="ctrl-btn" data-speed="0.5">0.5x</button>
+              <button class="ctrl-btn active" data-speed="1">1x</button>
+              <button class="ctrl-btn" data-speed="4">4x</button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

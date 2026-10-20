@@ -1,0 +1,253 @@
+================================================================================
+WAREHOUSE MULTI-AGENT PATH FINDING (MAPF) WITH LLM REPAIR & 3D REPLAY VIEWER
+PROJECT IMPLEMENTATION STATUS & PROGRESS REPORT
+Date: October 20, 2026
+================================================================================
+
+1. EXECUTIVE SUMMARY
+--------------------------------------------------------------------------------
+This project implements a complete lifelong MAPF simulation system with 
+disruption injection, incident detection, deterministic plan validation, multi-agent
+solvers (PIBT, LNS, Windowed PBS), and a high-performance browser 3D replay viewer
+built with Vite, TypeScript, and Three.js.
+
+Both foundational tracks (Part A: 3D Replay Viewer, and Part B: Python Simulation
+Pipeline) are actively implemented and tested.
+
+--------------------------------------------------------------------------------
+2. ENVIRONMENT & CORE SETUP
+--------------------------------------------------------------------------------
+- Python Runtime: Python 3.11.16 installed and managed via `uv` in a dedicated
+  virtual environment (.venv).
+- Node.js Runtime: Node.js LTS v24.20.0 and npm 11.19.0 configured.
+- Core Python Libraries Installed:
+  * numpy (>= 2.4.6)
+  * networkx (>= 3.6.1)
+  * pydantic (>= 2.14.1)
+  * instructor (>= 1.17.0)
+  * openai (>= 3.3.0)
+  * scikit-learn (>= 1.9.1)
+  * pytest (>= 9.1.1)
+  * trimesh (>= 5.1.1)
+  * pygltflib (>= 1.16.5)
+- Core Frontend Libraries Installed:
+  * three (>= 0.186.1)
+  * @types/three (>= 0.186.0)
+  * vite (>= 8.3.4)
+  * typescript (>= 6.0.3)
+- Specification & Architecture Documentation:
+  * CLAUDE.md: Architecture rules, rendering guidelines, pure-function Python
+    constraints, seeded random generation, and deterministic ground-truth validation.
+  * README.md: Full Replay JSON specification, schemas, and repository layout.
+
+--------------------------------------------------------------------------------
+3. ASSETS & SYNTHETIC DATA GENERATION (DAY 1)
+--------------------------------------------------------------------------------
+- Benchmark Map:
+  * MovingAI benchmark map 'warehouse-10-20-10-2-1.map' (161x63 grid, 5699 free cells)
+    downloaded and extracted into:
+    - maps/warehouse-10-20-10-2-1.map
+    - viewer/public/maps/warehouse-10-20-10-2-1.map
+- Textures & HDRI:
+  * Poly Haven CC0 1K HDRI 'warehouse.hdr' downloaded to viewer/public/textures/
+  * Poly Haven CC0 seamless concrete floor texture 'concrete_floor.jpg' downloaded
+    to viewer/public/textures/
+- 3D Procedural glTF/GLB Models (scripts/build_models.py):
+  * shelf.glb: 1m x 1.8m x 1m industrial warehouse racking (blue uprights, orange
+    cross beams, decking panels, and storage boxes).
+  * robot.glb: ~0.75m warehouse AMR drive unit with drive wheels, top turntable deck,
+    and a designated 'LED' status light material.
+  * barrier.glb: Traffic cone / safety barrier with orange base and reflective stripe.
+- Replay Generator (scripts/make_fake_replay.py):
+  * Based on Pydantic schemas in amr_repair/replay/models.py.
+  * Generates 100 robots over 300 steps with 6 distinct incidents:
+    - inc_001: Blocked cell in aisle (t=35, medium congestion)
+    - inc_002: Robot delay (t=80, low congestion)
+    - inc_003: Robot permanent failure (t=140, high congestion)
+    - inc_004 & inc_005: Interacting disruption pair (t=195, t=198) in same aisle
+    - inc_006: Cache hit repeat incident (t=250)
+  * Generated files:
+    - viewer/public/replays/demo.json (2.36 MB, mode: llm)
+    - viewer/public/replays/demo_baseline.json (2.36 MB, mode: baseline_pibt)
+    - runs/demo.json & runs/demo_baseline.json
+
+--------------------------------------------------------------------------------
+4. PART A — BROWSER 3D REPLAY VIEWER (STEPS 1 - 5)
+--------------------------------------------------------------------------------
+Built in `viewer/` using Vite + TypeScript + Three.js.
+Local dev server live at: http://127.0.0.1:5173/
+
+- 3D Warehouse Scene & Lighting:
+  * MovingAI .map parser converting grid cells to 3D world coordinates:
+    cell (x, y) -> world (x + 0.5, 0, y + 0.5).
+  * Concrete floor with repeat texture wrapping and subtle aisle guidance lane lines.
+  * All warehouse shelves rendered via a single instanced mesh (InstancedMesh)
+    casting soft shadows.
+  * DirectionalLight with 2048x2048 soft shadow map fitted to map bounds.
+  * Equirectangular reflection environment mapping using warehouse.hdr.
+  * ACESFilmicToneMapping (exposure 1.15), flat dark background, zero AmbientLight.
+- Robot Animation & Status Lighting:
+  * 100 robots rendered with InstancedMesh and blurred floor shadow decals.
+  * Ease-in-out interpolation between frames.
+  * Turn-before-move rotation: robots turn in the first 33% of the step, then translate.
+  * Dynamic per-instance emissive LED colors based on robot state:
+    - Moving: Light Blue (#38bdf8)
+    - Idle: Green (#10b981)
+    - Delayed: Amber pulsing at 1 Hz (#f59e0b)
+    - Failed: Off (#1e293b) with red chassis tint (#ef4444)
+    - Replanning: Magenta pulsing at 2 Hz (#d946ef)
+- Disruption & Path Visualizations:
+  * Dynamic barrier cones and red translucent floor tiles on blocked cells.
+  * Grey ring decals under failed robots.
+  * Invalidated paths rendered as dashed red fat lines (Line2).
+  * Repaired paths rendered as solid light blue fat lines smoothed via Catmull-Rom curves.
+  * Faint floor rectangles showing congestion regions colored by level (low/medium/high).
+  * Dashed magenta lines linking interacting incidents.
+  * Automatic dimming of non-affected robots to 60% when an incident is selected.
+- Interactive HUD & Timeline:
+  * Top-left Metrics Tiles: Repair Success %, Mean Recovery Steps, Path Cost Delta %,
+    LLM Calls vs Cache Hits.
+  * Baseline Toggle: Instant switch between LLM-guided replay and Baseline PIBT
+    without losing current step position.
+  * Top-right Live FPS Counter (60 FPS on integrated GPU).
+  * Scrubbable step slider with color-coded incident ticks (blocked red, failure grey,
+    delay amber).
+  * Playback controls: Play/Pause, 0.5x / 1x / 4x speed selectors, Prev/Next incident
+    buttons and keyboard shortcuts ('N' and 'P').
+  * Collapsible Right Incident Panel: Displays Sentinel, Cache, Dry-run, LLM directive,
+    Solver badge, and Validator verification attempts.
+  * Camera Presets:
+    - Key 1: Whole map overview
+    - Key 2: 45-degree aisle view
+    - Key 3: Follow selected robot (click robot to select)
+    - Smooth 1-second camera lerp between presets
+    - Smooth 4-second intro dolly on initial page load
+
+--------------------------------------------------------------------------------
+5. PART B — PYTHON RESEARCH PIPELINE (STAGES 1, 2, 3, 7, 8)
+--------------------------------------------------------------------------------
+Package: `amr_repair/`
+
+- Stage 1: Lifelong MAPF Simulator
+  * amr_repair/sim/grid.py: GridMap class loading MovingAI .map files into NumPy
+    boolean arrays and 4-connected NetworkX graphs.
+  * amr_repair/sim/agents.py: Robot dataclass tracking id, pos, goal, path, state.
+  * amr_repair/sim/lifelong.py: World class advancing simulation step-by-step,
+    assigning lifelong random goals upon arrival, and recording frame history.
+  * Unit tests: tests/test_stage1.py (all passed).
+
+- Stage 2: Disruption Injector
+  * amr_repair/disrupt/injector.py: Injector class supporting blocked cells, robot
+    failures, and delays with duration/unblocking.
+  * Supports overlap modes ('none', 'same_robot', 'same_aisle') to guarantee
+    interacting multi-robot disruptions.
+  * Unit tests: tests/test_stage2.py (all passed).
+
+- Stage 3: Sentinel Incident Detection
+  * amr_repair/sentinel/incident.py: IncidentRecord Pydantic model and 12-dimensional
+    normalized feature vector extractor (`features()`) for caching.
+  * amr_repair/sentinel/detect.py: IncidentDetector identifying affected robots whose
+    planned paths intersect disruption cells, computing padded congestion regions,
+    calculating density, and merging interacting incidents with `interacts_with`.
+  * Unit tests: tests/test_stage3.py (all passed).
+
+- Stages 7 & 8: Solvers and Deterministic Validator
+  * amr_repair/validate/validator.py: Pure deterministic ground-truth validator.
+    Checks in order:
+    1. Static blocked cells
+    2. Failed robot cells
+    3. Vertex collisions
+    4. Edge swap collisions
+    5. Deadlocks (10 consecutive steps stationary while not at goal)
+  * Solvers (shared signature: `solve(world, robots, priority, horizon)`):
+    - amr_repair/solvers/pibt.py: Priority Inheritance with Backtracking.
+    - amr_repair/solvers/space_time_astar.py: Space-Time A* search with vertex/edge
+      reservations.
+    - amr_repair/solvers/lns.py: Large Neighborhood Search destroying 3-5 robot
+      neighborhoods and repairing with Space-Time A*.
+    - amr_repair/solvers/windowed_pbs.py: Windowed Priority-Based Search exploring
+      priority orderings with 500ms timeout guarding.
+  * Unit tests: tests/test_stages7_8.py (all passed).
+
+--------------------------------------------------------------------------------
+6. TEST SUITE & VALIDATION SUMMARY
+--------------------------------------------------------------------------------
+All 11 unit tests in pytest pass with 100% success rate:
+- test_robots_never_occupy_obstacle: PASSED
+- test_robot_at_goal_gets_new_goal_next_step: PASSED
+- test_identical_seed_produces_identical_frames: PASSED
+- test_same_seed_gives_same_schedule: PASSED
+- test_failed_robot_never_moves_again: PASSED
+- test_overlap_same_robot_produces_shared_robot: PASSED
+- test_blocked_cell_not_on_path_yields_no_affected_robots: PASSED
+- test_two_disruptions_same_robot_merge: PASSED
+- test_density_in_range_and_features_shape: PASSED
+- test_validator_catches_all_violations: PASSED
+- test_each_solver_reroutes_and_validates: PASSED
+
+Frontend Build & Asset Serving:
+- TypeScript compilation and Vite production build (`npm run build`): SUCCESS (0 errors).
+- Dev server running on `http://127.0.0.1:5173/`.
+- All static assets (.map, .hdr, .jpg, .glb, .json) verified returning HTTP 200.
+
+--------------------------------------------------------------------------------
+7. WORKSPACE FILE INVENTORY
+--------------------------------------------------------------------------------
+- CLAUDE.md                                (Project rules & constraints)
+- README.md                                (Replay schema & architecture)
+- pyproject.toml                           (Python build config & dependencies)
+- maps/warehouse-10-20-10-2-1.map          (Benchmark warehouse map)
+- runs/demo.json                           (Replay dataset - LLM mode)
+- runs/demo_baseline.json                  (Replay dataset - Baseline mode)
+- scripts/build_models.py                  (GLB 3D model generator)
+- scripts/make_fake_replay.py              (Benchmark replay generator)
+- amr_repair/
+  - __init__.py
+  - sim/
+    - __init__.py, grid.py, agents.py, lifelong.py
+  - disrupt/
+    - __init__.py, injector.py
+  - sentinel/
+    - __init__.py, incident.py, detect.py
+  - validate/
+    - __init__.py, validator.py
+  - solvers/
+    - __init__.py, pibt.py, space_time_astar.py, lns.py, windowed_pbs.py
+  - replay/
+    - __init__.py, models.py
+  - cache/
+  - llm/
+  - loop/
+  - experiments/
+- tests/
+  - test_stage1.py
+  - test_stage2.py
+  - test_stage3.py
+  - test_stages7_8.py
+- viewer/
+  - package.json, tsconfig.json, index.html
+  - src/
+    - main.ts                              (Complete 3D viewer & state engine)
+    - style.css                            (Dark glassmorphism overlay stylesheet)
+  - public/
+    - maps/warehouse-10-20-10-2-1.map
+    - textures/warehouse.hdr, concrete_floor.jpg
+    - models/shelf.glb, robot.glb, barrier.glb
+    - replays/demo.json, demo_baseline.json
+
+--------------------------------------------------------------------------------
+8. REMAINING TASKS IN IMPLEMENTATION GUIDE
+--------------------------------------------------------------------------------
+1. Stage 6 (LLM Strategist):
+   - amr_repair/llm/schema.py: Pydantic Directive model.
+   - amr_repair/llm/prompts.py: System prompt explaining solvers and schema.
+   - amr_repair/llm/strategist.py: Instructor-wrapped OpenAI client with single retry.
+2. Stages 4-5 (Strategy Cache & Negative Memory):
+   - amr_repair/cache/store.py: StrategyCache with cosine similarity lookup.
+   - amr_repair/cache/negative.py: NegativeMemory tracking rejected directives.
+   - Dry-run verification before LLM calls.
+3. Stages 9-10 (Closed-Loop Controller & Experiments):
+   - amr_repair/loop/controller.py: Full pipeline orchestration.
+   - amr_repair/loop/logger.py & replay/exporter.py: JSON replay output writer.
+   - amr_repair/experiments/baselines.py, run.py, ablations.py: Experiment runner.
+================================================================================
