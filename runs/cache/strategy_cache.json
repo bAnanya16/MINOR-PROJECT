@@ -1,0 +1,38 @@
+[
+  {
+    "incident_id": "inc_002",
+    "hard_filter_key": "robot_delay|small|low",
+    "features": [
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.20000000298023224,
+      0.0,
+      0.022727273404598236
+    ],
+    "incident_summary": {
+      "affected_count": 2,
+      "congestion_level": "low"
+    },
+    "directive": {
+      "robots": [
+        0,
+        2
+      ],
+      "solver": "lns",
+      "priority": [
+        0,
+        2
+      ],
+      "horizon": 20,
+      "rationale": "Congested area; chosen LNS for neighborhood trajectory repair."
+    },
+    "outcome": {}
+  }
+]

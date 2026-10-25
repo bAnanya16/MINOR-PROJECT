@@ -399,13 +399,12 @@ def main():
     os.makedirs("runs", exist_ok=True)
     os.makedirs("viewer/public/replays", exist_ok=True)
     
-    # Generate LLM replay
+    # 1. Full Demo Replay (6 incidents)
     print("Generating demo.json (mode=llm)...")
     llm_replay = generate_fake_replay(seed=42, mode="llm")
     
     with open("runs/demo.json", "w", encoding="utf-8") as f:
         f.write(llm_replay.model_dump_json(indent=2))
-        
     with open("viewer/public/replays/demo.json", "w", encoding="utf-8") as f:
         f.write(llm_replay.model_dump_json(indent=2))
         
@@ -413,12 +412,42 @@ def main():
     baseline_replay = generate_fake_replay(seed=42, mode="baseline_pibt")
     with open("runs/demo_baseline.json", "w", encoding="utf-8") as f:
         f.write(baseline_replay.model_dump_json(indent=2))
-        
     with open("viewer/public/replays/demo_baseline.json", "w", encoding="utf-8") as f:
         f.write(baseline_replay.model_dump_json(indent=2))
+
+    # 2. Scenario Isolated (inc_001, inc_002, inc_003)
+    iso_replay = generate_fake_replay(seed=101, mode="llm")
+    iso_replay.incidents = [i for i in iso_replay.incidents if i.id in ("inc_001", "inc_002", "inc_003")]
+    with open("viewer/public/replays/scenario_isolated.json", "w", encoding="utf-8") as f:
+        f.write(iso_replay.model_dump_json(indent=2))
+    iso_base = generate_fake_replay(seed=101, mode="baseline_pibt")
+    iso_base.incidents = [i for i in iso_base.incidents if i.id in ("inc_001", "inc_002", "inc_003")]
+    with open("viewer/public/replays/scenario_isolated_baseline.json", "w", encoding="utf-8") as f:
+        f.write(iso_base.model_dump_json(indent=2))
+
+    # 3. Scenario Interacting (inc_004 & inc_005)
+    inter_replay = generate_fake_replay(seed=202, mode="llm")
+    inter_replay.incidents = [i for i in inter_replay.incidents if i.id in ("inc_004", "inc_005")]
+    with open("viewer/public/replays/scenario_interacting.json", "w", encoding="utf-8") as f:
+        f.write(inter_replay.model_dump_json(indent=2))
+    inter_base = generate_fake_replay(seed=202, mode="baseline_pibt")
+    inter_base.incidents = [i for i in inter_base.incidents if i.id in ("inc_004", "inc_005")]
+    with open("viewer/public/replays/scenario_interacting_baseline.json", "w", encoding="utf-8") as f:
+        f.write(inter_base.model_dump_json(indent=2))
+
+    # 4. Scenario Cache (inc_001 & inc_006)
+    cache_replay = generate_fake_replay(seed=303, mode="llm")
+    cache_replay.incidents = [i for i in cache_replay.incidents if i.id in ("inc_001", "inc_006")]
+    with open("viewer/public/replays/scenario_cache.json", "w", encoding="utf-8") as f:
+        f.write(cache_replay.model_dump_json(indent=2))
+    cache_base = generate_fake_replay(seed=303, mode="baseline_pibt")
+    cache_base.incidents = [i for i in cache_base.incidents if i.id in ("inc_001", "inc_006")]
+    with open("viewer/public/replays/scenario_cache_baseline.json", "w", encoding="utf-8") as f:
+        f.write(cache_base.model_dump_json(indent=2))
         
-    print("Successfully generated demo replays!")
+    print("Successfully generated all demo scenario replays!")
 
 
 if __name__ == "__main__":
     main()
+

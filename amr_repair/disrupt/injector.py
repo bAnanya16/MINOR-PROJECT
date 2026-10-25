@@ -18,8 +18,11 @@ class DisruptionItem:
     duration: Optional[int] = None  # For temporary blocked cells (unblocked at t + duration)
 
 
+Disruption = DisruptionItem
+
+
 class Injector:
-    def __init__(self, rng: np.random.Generator, schedule: Union[List[Dict[str, Any]], Dict[str, Any]], world: Optional[World] = None):
+    def __init__(self, rng: np.random.Generator, schedule: Optional[Union[List[Union[Dict[str, Any], DisruptionItem]], Dict[str, Any]]] = None, world: Optional[World] = None):
         self.rng: np.random.Generator = rng
         self.raw_schedule = schedule
         self.disruptions: List[DisruptionItem] = []
@@ -28,14 +31,17 @@ class Injector:
         if isinstance(schedule, list):
             # Explicit list of disruptions
             for item in schedule:
-                self.disruptions.append(DisruptionItem(
-                    type=item["type"],
-                    t=item["t"],
-                    cells=[tuple(c) for c in item.get("cells", [])],
-                    robot=item.get("robot"),
-                    k_steps=item.get("k_steps"),
-                    duration=item.get("duration")
-                ))
+                if isinstance(item, DisruptionItem):
+                    self.disruptions.append(item)
+                elif isinstance(item, dict):
+                    self.disruptions.append(DisruptionItem(
+                        type=item["type"],
+                        t=item["t"],
+                        cells=[tuple(c) for c in item.get("cells", [])],
+                        robot=item.get("robot"),
+                        k_steps=item.get("k_steps"),
+                        duration=item.get("duration")
+                    ))
         elif isinstance(schedule, dict):
             # Generator config: {rate, types, size_range, overlap: none | same_aisle | same_robot, max_steps}
             if world is not None:

@@ -56,3 +56,9 @@ class GridMap:
                     blocked[y, x] = True
 
         return cls(blocked, width, height)
+
+
+def load_map(file_path: str) -> GridMap:
+    """Helper function to load a MovingAI .map file."""
+    return GridMap.from_movingai(file_path)
+

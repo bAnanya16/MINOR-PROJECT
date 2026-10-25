@@ -1,0 +1,2 @@
+seed,mode,robots,steps,cache,validator,threshold,repair_success_rate,mean_recovery_steps,cost_delta_pct,llm_calls,llm_tokens,cache_hits,incidents_total
+42,baseline_pibt,10,10,on,on,0.85,1.0,0.0,0.0,0,0,0,0
