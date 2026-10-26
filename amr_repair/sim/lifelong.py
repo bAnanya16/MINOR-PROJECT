@@ -45,7 +45,7 @@ class World:
             # path includes current position as path[0]
             robot.path = path[1:]  # Steps to execute
             robot.state = "moving" if robot.path else "idle"
-        except (nx.NetworkXNoPath, nx.NodeNotFound):
+        except (nx.NetworkXNoPath, nx.NodeNotFound, nx.NetworkXError):
             robot.path = []
             robot.state = "idle"
 
@@ -96,7 +96,8 @@ class World:
     def _record_frame(self):
         positions = [r.pos for r in self.robots]
         states = [r.state for r in self.robots]
-        self.frames.append(Frame(t=self.t, pos=positions, state=states))
+        goals = [r.goal for r in self.robots]
+        self.frames.append(Frame(t=self.t, pos=positions, state=states, goals=goals))
 
     def to_replay(self, seed: int = 42, mode: str = "baseline_pibt", map_name: str = "warehouse-10-20-10-2-1") -> Dict[str, Any]:
         return {

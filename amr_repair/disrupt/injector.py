@@ -28,8 +28,19 @@ class Injector:
         self.disruptions: List[DisruptionItem] = []
         self._unblock_schedule: Dict[int, List[Tuple[int, int]]] = {}
 
-        if isinstance(schedule, list):
-            # Explicit list of disruptions
+        if schedule is None:
+            # Default procedural schedule when no explicit schedule is supplied
+            if world is not None:
+                default_config = {
+                    "rate": 0.05,
+                    "types": ["blocked_cell", "robot_failure", "robot_delay"],
+                    "overlap": "same_aisle",
+                    "max_steps": 300,
+                    "max_block_size": 3,
+                }
+                self._generate_schedule(default_config, world)
+        elif isinstance(schedule, list):
+            # Explicit list of disruptions. An empty list [] intentionally yields 0 disruptions.
             for item in schedule:
                 if isinstance(item, DisruptionItem):
                     self.disruptions.append(item)
@@ -43,7 +54,7 @@ class Injector:
                         duration=item.get("duration")
                     ))
         elif isinstance(schedule, dict):
-            # Generator config: {rate, types, size_range, overlap: none | same_aisle | same_robot, max_steps}
+            # Generator config: {rate, types, max_block_size, overlap: none | same_aisle | same_robot, max_steps}
             if world is not None:
                 self._generate_schedule(schedule, world)
 
@@ -55,13 +66,14 @@ class Injector:
         allowed_types = config.get("types", ["blocked_cell", "robot_failure", "robot_delay"])
         overlap_mode = config.get("overlap", "none")
         max_steps = config.get("max_steps", 200)
+        max_block_size = config.get("max_block_size", 3)
         free_cells = world.free_cells
 
         t = 10
         while t < max_steps:
             if self.rng.random() < rate:
                 dtype = str(self.rng.choice(allowed_types))
-                d_item = self._create_disruption(dtype, t, world, free_cells)
+                d_item = self._create_disruption(dtype, t, world, free_cells, max_block_size=max_block_size)
                 self.disruptions.append(d_item)
 
                 # If overlap requested, place a second disruption within 5 cells or same robot within 10 steps
@@ -82,7 +94,7 @@ class Injector:
                         )
                         self.disruptions.append(d_item2)
                     elif overlap_mode in ("same_aisle", "none", "same_robot"):
-                        # Within 5 cells of the first disruption
+                        # Within 5 cells of the first disruption along corridor
                         base_cell = d_item.cells[0] if d_item.cells else free_cells[0]
                         nearby_x = max(0, min(world.map.width - 1, base_cell[0] + int(self.rng.integers(-4, 5))))
                         nearby_y = max(0, min(world.map.height - 1, base_cell[1] + int(self.rng.integers(-2, 3))))
@@ -101,12 +113,28 @@ class Injector:
             else:
                 t += 1
 
-    def _create_disruption(self, dtype: str, t: int, world: World, free_cells: List[Tuple[int, int]]) -> DisruptionItem:
+    def _create_disruption(self, dtype: str, t: int, world: World, free_cells: List[Tuple[int, int]], max_block_size: int = 3) -> DisruptionItem:
         if dtype == "blocked_cell":
             cell_idx = int(self.rng.integers(0, len(free_cells)))
-            cell = free_cells[cell_idx]
+            seed_cell = free_cells[cell_idx]
             duration = int(self.rng.integers(15, 45)) if self.rng.random() < 0.5 else None
-            return DisruptionItem(type="blocked_cell", t=t, cells=[cell], duration=duration)
+
+            # Procedural contiguous multi-cell aisle blockage (1 to max_block_size contiguous cells)
+            block_size = int(self.rng.integers(1, max(2, max_block_size + 1)))
+            cells = [seed_cell]
+            # Try 4-connected directions along corridor
+            directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            dir_choice = directions[int(self.rng.integers(0, len(directions)))]
+            curr = seed_cell
+            for _ in range(block_size - 1):
+                nxt = (curr[0] + dir_choice[0], curr[1] + dir_choice[1])
+                if world.map.is_free(nxt) and nxt not in cells:
+                    cells.append(nxt)
+                    curr = nxt
+                else:
+                    break
+
+            return DisruptionItem(type="blocked_cell", t=t, cells=cells, duration=duration)
 
         elif dtype == "robot_failure":
             robot = self.rng.choice(world.robots)

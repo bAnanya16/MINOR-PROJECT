@@ -1,0 +1,17 @@
+{
+  "robot_failure|small|low": [
+    {
+      "robots": [
+        10,
+        16
+      ],
+      "solver": "lns",
+      "priority": [
+        10,
+        16
+      ],
+      "horizon": 20,
+      "rationale": "Cache hit from inc_001 (sim=1.00)"
+    }
+  ]
+}

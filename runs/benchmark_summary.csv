@@ -1,0 +1,7 @@
+Condition,Mode,Overlap,Seed,Cache,Validator,Threshold,Incidents,SuccessRatePct,MeanRecoverySteps,CostDeltaPct,LLMCalls,LLMTokens,LLMCallsAvoided,MeanLLMLatencyMs,CacheHits,CacheLookups,CacheHitRatePct,VerifiedReuses,VerifiedReuseRatePct,MeanRepairLatencyMs,InterceptedViolations,EmergencyHolds,RunDurationSec,Status
+Proposed_Framework,llm,same_aisle,42,On,On,0.85,2,100.0,17.5,6.0,1,0,1,2372.0,1,2,50.0,1,50.0,1190.54,0,0,2.94,COMPLETED
+Fixed_PIBT,baseline_pibt,same_aisle,42,Off,On,0.85,2,100.0,20.0,0.0,0,0,0,0.0,0,0,0.0,0,0.0,0.17,0,0,0.03,COMPLETED
+Fixed_PBS,baseline_pbs,same_aisle,42,Off,On,0.85,2,100.0,20.0,0.0,0,0,0,0.0,0,0,0.0,0,0.0,0.34,0,0,0.02,COMPLETED
+Ablation_NoCache,llm,same_aisle,42,Off,On,0.85,2,100.0,17.5,6.0,2,0,0,2307.5,0,0,0.0,0,0.0,2317.65,0,0,4.67,COMPLETED
+Ablation_Thresh_070,llm,same_aisle,42,On,On,0.7,2,100.0,17.5,6.0,1,0,1,2265.0,1,2,50.0,1,50.0,1137.95,0,0,2.31,COMPLETED
+Ablation_Thresh_095,llm,same_aisle,42,On,On,0.95,2,100.0,17.5,6.0,1,0,1,2483.0,1,2,50.0,1,50.0,1246.28,0,0,2.53,COMPLETED

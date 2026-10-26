@@ -37,7 +37,14 @@ def solve(world: World, robots: List[int], priority: List[int], horizon: int) ->
             goal = robot_map[r_id].goal
 
             # Candidate neighbors (including wait)
-            neighbors = list(world.map.graph.neighbors(curr)) + [curr]
+            if world.map.graph.has_node(curr):
+                neighbors = list(world.map.graph.neighbors(curr)) + [curr]
+            else:
+                neighbors = [
+                    (curr[0] + dx, curr[1] + dy)
+                    for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    if world.map.is_free((curr[0] + dx, curr[1] + dy))
+                ] + [curr]
 
             # Sort by heuristic distance to goal
             neighbors.sort(key=lambda c: manhattan_distance(c, goal))

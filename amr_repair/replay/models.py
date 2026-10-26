@@ -24,6 +24,7 @@ class Frame(BaseModel):
     t: int
     pos: List[Tuple[int, int]]  # Indexed by robot id
     state: List[RobotState]     # Indexed by robot id
+    goals: Optional[List[Tuple[int, int]]] = None  # Optional ground-truth goals
 
 
 DisruptionType = Literal["blocked_cell", "robot_failure", "robot_delay"]
@@ -109,12 +110,48 @@ class Incident(BaseModel):
 
 
 class ReplayMetrics(BaseModel):
-    repair_success_rate: float
-    mean_recovery_steps: float
-    cost_delta_pct: float
-    llm_calls: int
-    llm_tokens: int
-    cache_hits: int
+    # Core research performance rates
+    repair_success_rate: float = 1.0
+    mean_recovery_steps: float = 0.0
+    cost_delta_pct: float = 0.0
+    sum_of_costs_delta: int = 0
+    makespan_delta: int = 0
+
+    # LLM Telemetry
+    llm_calls: int = 0
+    llm_tokens: int = 0
+    llm_calls_avoided: int = 0
+    mean_llm_latency_ms: float = 0.0
+
+    # Cache Telemetry
+    cache_lookups: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    cache_hit_rate_pct: float = 0.0
+    dry_run_successes: int = 0
+    dry_run_failures: int = 0
+    verified_cache_reuse_count: int = 0
+    verified_reuse_rate_pct: float = 0.0
+    cache_insertions: int = 0
+    cache_evictions: int = 0
+
+    # Latencies & Repair Timing
+    mean_solver_latency_ms: float = 0.0
+    mean_validator_latency_ms: float = 0.0
+    mean_total_repair_latency_ms: float = 0.0
+
+    # Safety & Validator Telemetry
+    safety_violations_intercepted: int = 0
+    executed_safety_violations: int = 0
+    failed_repair_attempts: int = 0
+    fallback_invocations: int = 0
+    emergency_holds: int = 0
+
+    # Incident breakdown
+    incidents_total: int = 0
+    incidents_by_type: Dict[str, int] = Field(default_factory=dict)
+    incidents_isolated: int = 0
+    incidents_interacting: int = 0
 
 
 class Replay(BaseModel):

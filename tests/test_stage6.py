@@ -81,3 +81,19 @@ def test_strategist_heuristic_choice():
     d_retry = strat.choose(inc, violation="vertex collision")
     assert d_retry.solver == "windowed_pbs"
     assert d_retry.horizon == 30
+    assert strat.last_provider == "heuristic"
+
+
+def test_strategist_fallback_resilience():
+    """Ensure Strategist cleanly falls back to heuristic if external LLM client throws."""
+    strat = Strategist()
+    # Force client to fail by setting it to None and invalid ollama url
+    strat.client = None
+    strat.ollama_client = None
+
+    inc = make_test_incident()
+    directive = strat.choose(inc)
+    assert directive is not None
+    assert directive.solver in ["pibt", "lns", "windowed_pbs"]
+    assert strat.last_provider == "heuristic"
+

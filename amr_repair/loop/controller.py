@@ -2,8 +2,9 @@
 
 import os
 import time
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass
+import logging
+from typing import Dict, List, Tuple, Optional, Any, Union
+from dataclasses import dataclass, field
 import numpy as np
 
 from amr_repair.sim.grid import load_map
@@ -28,6 +29,7 @@ from amr_repair.replay.models import (
 )
 from amr_repair.replay.exporter import export_replay
 
+logger = logging.getLogger(__name__)
 
 SOLVER_REGISTRY = {
     "pibt": pibt_solver.solve,
@@ -43,8 +45,13 @@ class SimulationConfig:
     steps: int = 300
     seed: int = 42
     mode: str = "llm"  # 'llm', 'baseline_pibt', 'baseline_lns', 'baseline_pbs'
-    schedule: Optional[List[Disruption]] = None
+    schedule: Optional[Union[List[Disruption], Dict[str, Any]]] = None
+    disruption_rate: float = 0.05
+    disruption_types: List[str] = field(default_factory=lambda: ["blocked_cell", "robot_failure", "robot_delay"])
+    overlap_mode: str = "same_aisle"  # "none", "same_aisle", "same_robot"
+    max_block_size: int = 3
     cache_enabled: bool = True
+    cache_capacity: int = 500
     validator_enabled: bool = True
     cache_threshold: float = 0.85
     run_id: str = "demo"
@@ -74,7 +81,17 @@ class SimulationController:
         self.world = World(self.grid_map, robots=robots, rng=self.rng)
 
         # 2. Initialize Injector and Detector
-        self.injector = Injector(rng=self.rng, schedule=config.schedule)
+        if config.schedule is None:
+            gen_config = {
+                "rate": config.disruption_rate,
+                "types": config.disruption_types,
+                "overlap": config.overlap_mode,
+                "max_steps": config.steps,
+                "max_block_size": config.max_block_size,
+            }
+            self.injector = Injector(rng=self.rng, schedule=gen_config, world=self.world)
+        else:
+            self.injector = Injector(rng=self.rng, schedule=config.schedule, world=self.world)
         self.detector = IncidentDetector()
 
         # 3. Strategy Cache and Negative Memory
@@ -83,6 +100,7 @@ class SimulationController:
         self.negative_memory = NegativeMemory(filepath=neg_mem_path) if config.cache_enabled else NegativeMemory()
         self.strategy_cache = StrategyCache(
             threshold=config.cache_threshold,
+            max_capacity=config.cache_capacity,
             negative_memory=self.negative_memory,
             filepath=cache_path,
         ) if config.cache_enabled else None
@@ -118,7 +136,11 @@ class SimulationController:
 
     def _handle_incident(self, incident: IncidentRecord, t: int) -> None:
         """Handle path repair for a detected incident using Cache -> LLM -> Solvers -> Validator -> Fallback."""
-        affected = [r_id for r_id in incident.affected_robots if r_id < len(self.world.robots)]
+        t_incident_start = time.perf_counter()
+        affected = [
+            r_id for r_id in incident.affected_robots
+            if r_id < len(self.world.robots) and self.world.robots[r_id].state != "failed"
+        ]
         if not affected:
             return
 
@@ -133,8 +155,12 @@ class SimulationController:
         llm_result: Optional[LLMResult] = None
         validator_attempts: List[ValidatorAttempt] = []
         fallback_used = False
+        emergency_hold = False
         repaired_paths: Dict[int, List[Tuple[int, int]]] = {}
         chosen_directive: Optional[Directive] = None
+
+        total_solver_time = 0.0
+        total_validator_time = 0.0
 
         # Mode: Baselines skip cache and LLM
         if self.config.mode.startswith("baseline_"):
@@ -149,9 +175,34 @@ class SimulationController:
                 horizon=20,
                 rationale=f"Baseline {solver_key} execution",
             )
-            repaired_paths = chosen_solver(self.world, affected, affected, 20)
-            verdict = validate(repaired_paths, self.world, t) if self.config.validator_enabled else Verdict(valid=True)
+            t_s = time.perf_counter()
+            base_paths = chosen_solver(self.world, affected, affected, 20)
+            total_solver_time += (time.perf_counter() - t_s)
+
+            t_v = time.perf_counter()
+            verdict = validate(base_paths, self.world, t)
+            total_validator_time += (time.perf_counter() - t_v)
+
             validator_attempts.append(ValidatorAttempt(attempt=1, valid=verdict.valid, violation=verdict.violation))
+
+            if self.config.validator_enabled:
+                if verdict.valid:
+                    repaired_paths = base_paths
+                else:
+                    # Baseline produced invalid path: enforce safe emergency hold
+                    emergency_hold = True
+                    fallback_used = True
+                    repaired_paths = {r_id: [self.world.robots[r_id].pos] * 10 for r_id in affected}
+                    validator_attempts.append(
+                        ValidatorAttempt(attempt=2, valid=False, violation=f"emergency_hold: baseline invalid ({verdict.violation})")
+                    )
+            else:
+                # Controlled evaluation mode: record violation, but execute stationary safe hold
+                if not verdict.valid:
+                    repaired_paths = {r_id: [self.world.robots[r_id].pos] * 10 for r_id in affected}
+                else:
+                    repaired_paths = base_paths
+
         else:
             # LLM Mode: Cache lookup -> Dry run -> LLM choose -> Validate -> Retry -> Fallback
             cache_hit_directive: Optional[Directive] = None
@@ -163,13 +214,19 @@ class SimulationController:
 
                     # Dry-run verification on current live state
                     solver_fn = SOLVER_REGISTRY.get(cache_hit_directive.solver, pibt_solver.solve)
+                    t_s = time.perf_counter()
                     dry_paths = solver_fn(
                         self.world,
                         cache_hit_directive.robots,
                         cache_hit_directive.priority,
                         cache_hit_directive.horizon,
                     )
-                    dry_verdict = validate(dry_paths, self.world, t) if self.config.validator_enabled else Verdict(valid=True)
+                    total_solver_time += (time.perf_counter() - t_s)
+
+                    t_v = time.perf_counter()
+                    dry_verdict = validate(dry_paths, self.world, t)
+                    total_validator_time += (time.perf_counter() - t_v)
+
                     dry_run_result = DryRunResult(
                         ran=True,
                         valid=dry_verdict.valid,
@@ -180,6 +237,7 @@ class SimulationController:
                         chosen_directive = cache_hit_directive
                         repaired_paths = dry_paths
                         validator_attempts.append(ValidatorAttempt(attempt=1, valid=True))
+                        self.strategy_cache.record_verified_reuse(matched_id)
                     else:
                         # Dry run failed: add to negative memory and fall through to LLM
                         self.negative_memory.add(incident, cache_hit_directive)
@@ -203,8 +261,13 @@ class SimulationController:
                     ),
                 )
                 solver_fn = SOLVER_REGISTRY.get(directive1.solver, pibt_solver.solve)
+                t_s = time.perf_counter()
                 paths1 = solver_fn(self.world, directive1.robots, directive1.priority, directive1.horizon)
-                verdict1 = validate(paths1, self.world, t) if self.config.validator_enabled else Verdict(valid=True)
+                total_solver_time += (time.perf_counter() - t_s)
+
+                t_v = time.perf_counter()
+                verdict1 = validate(paths1, self.world, t)
+                total_validator_time += (time.perf_counter() - t_v)
                 validator_attempts.append(ValidatorAttempt(attempt=1, valid=verdict1.valid, violation=verdict1.violation))
 
                 if verdict1.valid:
@@ -213,12 +276,17 @@ class SimulationController:
                     if self.config.cache_enabled and self.strategy_cache is not None:
                         self.strategy_cache.store(incident, directive1)
                 else:
-                    # Attempt 2: One LLM retry carrying exact violation
+                    # Attempt 2: Exactly one LLM retry carrying exact validation violation
                     self.negative_memory.add(incident, directive1)
                     directive2 = self.strategist.choose(incident, violation=verdict1.violation)
                     solver_fn = SOLVER_REGISTRY.get(directive2.solver, pibt_solver.solve)
+                    t_s = time.perf_counter()
                     paths2 = solver_fn(self.world, directive2.robots, directive2.priority, directive2.horizon)
-                    verdict2 = validate(paths2, self.world, t) if self.config.validator_enabled else Verdict(valid=True)
+                    total_solver_time += (time.perf_counter() - t_s)
+
+                    t_v = time.perf_counter()
+                    verdict2 = validate(paths2, self.world, t)
+                    total_validator_time += (time.perf_counter() - t_v)
                     validator_attempts.append(ValidatorAttempt(attempt=2, valid=verdict2.valid, violation=verdict2.violation))
 
                     if verdict2.valid:
@@ -234,24 +302,45 @@ class SimulationController:
                             affected,
                             key=lambda rid: manhattan_distance(self.world.robots[rid].pos, self.world.robots[rid].goal),
                         )
+                        t_s = time.perf_counter()
                         fallback_paths = pbs_solver.solve(self.world, affected, sorted_priority, 30)
-                        verdict_fb = validate(fallback_paths, self.world, t) if self.config.validator_enabled else Verdict(valid=True)
-                        validator_attempts.append(ValidatorAttempt(attempt=3, valid=verdict_fb.valid, violation=verdict_fb.violation))
-                        chosen_directive = Directive(
-                            robots=affected,
-                            solver="windowed_pbs",
-                            priority=sorted_priority,
-                            horizon=30,
-                            rationale="Fixed deterministic fallback strategy after validation retries.",
-                        )
-                        repaired_paths = fallback_paths
+                        total_solver_time += (time.perf_counter() - t_s)
 
-        # Apply repaired paths to robots in the world
+                        t_v = time.perf_counter()
+                        verdict_fb = validate(fallback_paths, self.world, t)
+                        total_validator_time += (time.perf_counter() - t_v)
+                        validator_attempts.append(ValidatorAttempt(attempt=3, valid=verdict_fb.valid, violation=verdict_fb.violation))
+
+                        if verdict_fb.valid:
+                            chosen_directive = Directive(
+                                robots=affected,
+                                solver="windowed_pbs",
+                                priority=sorted_priority,
+                                horizon=30,
+                                rationale="Fixed deterministic fallback strategy after validation retries.",
+                            )
+                            repaired_paths = fallback_paths
+                        else:
+                            # CRITICAL SAFETY: Fallback plan also failed validation!
+                            # Enforce safe emergency hold (wait in place); never execute unvalidated colliding paths
+                            emergency_hold = True
+                            repaired_paths = {r_id: [self.world.robots[r_id].pos] * 10 for r_id in affected}
+                            validator_attempts.append(
+                                ValidatorAttempt(attempt=4, valid=False, violation=f"emergency_hold: fallback failed ({verdict_fb.violation})")
+                            )
+
+        # Apply paths safely to robots in the world
         for r_id, p in repaired_paths.items():
             if r_id < len(self.world.robots):
                 robot = self.world.robots[r_id]
-                robot.path = list(p)
-                robot.state = "replanning"
+                if emergency_hold:
+                    # Halt safely in place; delay count ensures robot does not resume until clear
+                    robot.path = []
+                    robot.state = "delayed"
+                    robot.delay_remaining = 10
+                else:
+                    robot.path = list(p)
+                    robot.state = "replanning"
 
         # Format repaired paths for log
         repaired_paths_dict = {str(k): [list(pos) for pos in v] for k, v in repaired_paths.items()}
@@ -289,7 +378,16 @@ class SimulationController:
             ),
         )
 
-        self.logger.record_incident(replay_incident)
+        total_repair_ms = (time.perf_counter() - t_incident_start) * 1000.0
+        telemetry = {
+            "solver_latency_ms": round(total_solver_time * 1000.0, 2),
+            "validator_latency_ms": round(total_validator_time * 1000.0, 2),
+            "total_repair_latency_ms": round(total_repair_ms, 2),
+            "failed_repair": fallback_used,
+            "cache_insertions": self.strategy_cache.insertions if self.strategy_cache else 0,
+            "cache_evictions": self.strategy_cache.evictions if self.strategy_cache else 0,
+        }
+        self.logger.record_incident(replay_incident, telemetry=telemetry)
 
     def _build_replay(self) -> Replay:
         """Assembles the final Replay model from simulation history."""

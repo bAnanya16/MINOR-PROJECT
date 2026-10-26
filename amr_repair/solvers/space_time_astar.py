@@ -41,7 +41,14 @@ def plan_space_time_path(
 
         next_t = g + 1
         # Possible actions: 4-connected movements + wait
-        candidates = list(world.map.graph.neighbors(current)) + [current]
+        if world.map.graph.has_node(current):
+            candidates = list(world.map.graph.neighbors(current)) + [current]
+        else:
+            candidates = [
+                (current[0] + dx, current[1] + dy)
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                if world.map.is_free((current[0] + dx, current[1] + dy))
+            ] + [current]
 
         for cand in candidates:
             # Vertex conflict check at next_t

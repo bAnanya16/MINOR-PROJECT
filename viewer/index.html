@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Warehouse MAPF 3D Replay Digital Twin</title>
+    <title>AMR Digital Twin Simulator | Disruption-Aware Path Repair</title>
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,391 +12,493 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <!-- 3D WebGPU / WebGL Canvas Container -->
-    <div id="canvas-container"></div>
+    <div id="app-layout">
+      <!-- 1. TOP NAVIGATION & EXPERIMENT CONTROLS -->
+      <header class="top-header">
+        <!-- Left: Product Branding -->
+        <div class="brand-group">
+          <div class="brand-icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div class="brand-text-block">
+            <span class="brand-title">AMR Digital Twin</span>
+            <span class="brand-subtitle">Disruption-Aware Path Repair Simulation</span>
+          </div>
+        </div>
 
-    <!-- UI Overlay container -->
-    <div id="ui-overlay">
-      <!-- Top Navigation & Telemetry Bar -->
-      <header class="top-bar">
-        <!-- Brand & System Live Indicator -->
-        <div class="brand-panel glass-panel interactive">
-          <div class="brand-header">
-            <div class="brand-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-                <circle cx="7" cy="8" r="1.5" fill="#38bdf8"></circle>
-                <circle cx="17" cy="8" r="1.5" fill="#38bdf8"></circle>
-              </svg>
-            </div>
-            <div class="brand-text">
-              <div class="brand-title">AMR DIGITAL TWIN</div>
-              <div class="brand-subtitle">LIFELONG MAPF // AUTONOMOUS REPAIR</div>
-            </div>
-            <div class="live-pill">
-              <span class="live-pulse"></span>
-              <span>LIVE 3D</span>
-            </div>
+        <!-- Center: Experiment & Scenario Selectors -->
+        <div class="controls-selectors-group">
+          <div class="control-field">
+            <label class="field-label" for="experiment-select">Experiment</label>
+            <select id="experiment-select" class="custom-select">
+              <option value="latest_experiment" selected>latest_experiment (30 AMRs - Recommended Demo)</option>
+              <option value="demo">demo (100 AMRs - Large Scenario)</option>
+              <option value="scenario_isolated">scenario_isolated (100 AMRs)</option>
+              <option value="scenario_interacting">scenario_interacting (100 AMRs)</option>
+              <option value="scenario_cache">scenario_cache (100 AMRs)</option>
+            </select>
           </div>
 
-          <!-- Scenario Dropdown Selector -->
-          <div class="scenario-selector-wrap">
-            <span class="sub-label">Scenario:</span>
+          <div class="control-field">
+            <label class="field-label" for="mode-select">Mode</label>
+            <select id="mode-select" class="custom-select">
+              <option value="llm" selected>LLM (Adaptive)</option>
+              <option value="baseline_pibt">Baseline PIBT</option>
+              <option value="baseline_lns">Baseline LNS</option>
+              <option value="baseline_pbs">Baseline PBS</option>
+            </select>
+          </div>
+
+          <div class="control-field">
+            <label class="field-label" for="scenario-select">Scenario</label>
             <select id="scenario-select" class="custom-select">
-              <option value="demo" selected>Scenario 1: Multi-Incident Showcase (6 Events)</option>
-              <option value="scenario_isolated">Scenario 2: Isolated Aisle Sequence</option>
-              <option value="scenario_interacting">Scenario 3: Interacting Disruptions (Joint PBS)</option>
-              <option value="scenario_cache">Scenario 4: Cache Hit & Fast Execution</option>
+              <option value="same_aisle" selected>Same Aisle (Interacting)</option>
+              <option value="multi_incident">Multi-Incident Showcase</option>
+              <option value="isolated_aisle">Isolated Sequence</option>
             </select>
           </div>
         </div>
 
-        <!-- Comparative Metrics KPIs -->
-        <div class="metrics-deck glass-panel interactive">
-          <div class="metric-card">
-            <div class="metric-head">
-              <span class="metric-title">Repair Success</span>
-              <span class="metric-badge green" id="badge-success">+13.0%</span>
+        <!-- Right: Header KPI Summary Chips -->
+        <div class="header-kpi-group">
+          <div class="header-chip" id="chip-robots">
+            <div class="chip-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
             </div>
-            <div class="metric-value-row">
-              <span class="metric-num" id="metric-success">98.0%</span>
-              <span class="metric-sub" id="base-success">vs 85.0% base</span>
-            </div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-head">
-              <span class="metric-title">Mean Recovery</span>
-              <span class="metric-badge cyan" id="badge-recovery">-2.6 steps</span>
-            </div>
-            <div class="metric-value-row">
-              <span class="metric-num" id="metric-recovery">4.8 <span class="unit">steps</span></span>
-              <span class="metric-sub" id="base-recovery">vs 7.4 base</span>
+            <div class="chip-content">
+              <span class="chip-label">Robots</span>
+              <span class="chip-val" id="chip-robots-count">30</span>
             </div>
           </div>
 
-          <div class="metric-card">
-            <div class="metric-head">
-              <span class="metric-title">Path Cost Δ</span>
-              <span class="metric-badge purple" id="badge-cost">-5.7%</span>
+          <div class="header-chip" id="chip-steps">
+            <div class="chip-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
-            <div class="metric-value-row">
-              <span class="metric-num" id="metric-cost">+3.2%</span>
-              <span class="metric-sub" id="base-cost">vs +8.9% base</span>
+            <div class="chip-content">
+              <span class="chip-label">Steps</span>
+              <span class="chip-val" id="chip-steps-count">60</span>
             </div>
           </div>
 
-          <div class="metric-card">
-            <div class="metric-head">
-              <span class="metric-title">LLM / Cache</span>
-              <span class="metric-badge amber" id="badge-cache">Cache Hit</span>
+          <div class="header-chip warning" id="chip-incidents">
+            <div class="chip-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             </div>
-            <div class="metric-value-row">
-              <span class="metric-num" id="metric-llm">5 <span class="unit">calls</span></span>
-              <span class="metric-sub" id="base-llm">1 cache hit</span>
+            <div class="chip-content">
+              <span class="chip-label">Incidents</span>
+              <span class="chip-val" id="chip-incidents-count">2</span>
             </div>
           </div>
-        </div>
 
-        <!-- Controls: Presets, FPS, Mode Switcher -->
-        <div class="status-controls-panel glass-panel interactive">
-          <div class="status-meta-row">
-            <div class="fps-chip">
-              <span class="fps-dot"></span>
-              <span id="fps-counter">60 FPS</span>
+          <div class="header-chip success" id="chip-success">
+            <div class="chip-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </div>
-            <div class="fleet-chip">
-              <span class="fleet-count">100 AMRs</span>
+            <div class="chip-content">
+              <span class="chip-label">Success Rate</span>
+              <span class="chip-val" id="chip-success-rate">100%</span>
             </div>
-            <button id="help-btn" class="icon-btn" title="Keyboard Shortcuts & Legend">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            </button>
-          </div>
-
-          <!-- Camera Preset Selector -->
-          <div class="camera-preset-bar">
-            <span class="bar-caption">View:</span>
-            <button class="cam-btn active" data-cam="1" title="Overview (Key 1)"><span class="kbd">1</span> Map</button>
-            <button class="cam-btn" data-cam="2" title="45° Aisle View (Key 2)"><span class="kbd">2</span> Aisle</button>
-            <button class="cam-btn" data-cam="3" title="Follow Selected Robot (Key 3)"><span class="kbd">3</span> Follow</button>
-          </div>
-
-          <!-- Mode Toggle Switcher -->
-          <div class="mode-toggle-deck">
-            <div class="mode-segmented-control">
-              <button class="mode-seg-btn active" id="mode-llm-btn">
-                <span class="seg-icon">🧠</span> LLM Strategist
-              </button>
-              <button class="mode-seg-btn" id="mode-base-btn">
-                <span class="seg-icon">⚙️</span> Baseline PIBT
-              </button>
-            </div>
-            <input type="checkbox" id="baseline-toggle" style="display:none;" />
           </div>
         </div>
       </header>
 
-      <!-- Center Floating Notification Toast (e.g. Incident Detected / Repaired) -->
-      <div id="toast-notification" class="toast-card glass-panel hidden">
-        <div class="toast-icon">⚡</div>
-        <div class="toast-content">
-          <div class="toast-title" id="toast-title">Incident Detected</div>
-          <div class="toast-desc" id="toast-desc">Sentinel flagged disruption. Replanning paths...</div>
-        </div>
-      </div>
+      <!-- 2. MAIN CENTRAL STAGE (VIEWPORT + SIDEBAR) -->
+      <main class="main-stage">
+        <!-- Stage Left Column: 3D Viewport & Lower Controls -->
+        <section class="stage-left-col">
+          <!-- Central 3D Warehouse Viewport -->
+          <div class="viewport-card" id="viewport-card">
+            <div id="canvas-container"></div>
 
-      <!-- Left Bottom Floating Robot Telemetry Card (Shown when robot is clicked) -->
-      <div id="robot-card" class="robot-telemetry-card glass-panel interactive hidden">
-        <div class="card-header">
-          <div class="robot-title-wrap">
-            <span class="robot-status-indicator" id="robot-card-status-dot"></span>
-            <span class="robot-id" id="robot-card-id">AMR #17</span>
-          </div>
-          <button class="card-close-btn" id="robot-card-close">&times;</button>
-        </div>
-        <div class="robot-stats-grid">
-          <div class="stat-item">
-            <span class="stat-lbl">State</span>
-            <span class="stat-val status-text" id="robot-card-state">Moving</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-lbl">Position</span>
-            <span class="stat-val mono" id="robot-card-pos">(42, 18)</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-lbl">Target Goal</span>
-            <span class="stat-val mono" id="robot-card-goal">(89, 54)</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-lbl">Distance</span>
-            <span class="stat-val mono" id="robot-card-dist">38 cells</span>
-          </div>
-        </div>
-        <div class="card-action-row">
-          <button class="card-action-btn primary" id="robot-follow-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-            Follow Camera
-          </button>
-        </div>
-      </div>
-
-      <!-- Right Collapsible Incident Inspector Panel -->
-      <aside id="incident-panel" class="incident-drawer glass-panel interactive hidden">
-        <div class="drawer-header">
-          <div class="drawer-title-wrap">
-            <span class="incident-icon">⚠️</span>
-            <div>
-              <div class="drawer-title" id="incident-panel-title">Incident Details</div>
-              <div class="drawer-subtitle" id="incident-panel-subtitle">Step t=35 • Blocked Aisle</div>
-            </div>
-          </div>
-          <button class="drawer-close-btn" id="incident-close-btn" title="Close Panel (Esc)">&times;</button>
-        </div>
-
-        <div class="drawer-scroll-body">
-          <!-- 1. Sentinel Detector Card -->
-          <div class="diagnostic-card card-sentinel">
-            <div class="diag-header">
-              <span class="diag-icon">📡</span>
-              <span class="diag-title">Sentinel Incident Detection</span>
-              <span class="diag-badge blue" id="inc-sentinel-badge">Active</span>
-            </div>
-            <div class="diag-content" id="inc-sentinel-text">Detection info...</div>
-            <div class="affected-chips-container" id="inc-affected-chips"></div>
-          </div>
-
-          <!-- 2. Strategy Cache Card -->
-          <div class="diagnostic-card card-cache">
-            <div class="diag-header">
-              <span class="diag-icon">⚡</span>
-              <span class="diag-title">Strategy Cache Verification</span>
-              <span class="diag-badge purple" id="inc-cache-badge">Lookup</span>
-            </div>
-            <div class="diag-content" id="inc-cache-text">Cache lookup...</div>
-            <div class="sim-meter-wrap" id="inc-cache-meter-wrap">
-              <div class="sim-meter-label">
-                <span>Similarity Match</span>
-                <span id="inc-cache-sim-val">0%</span>
+            <!-- In-Viewport Collapsible Legend (Top-Left) -->
+            <div class="viewport-legend-card" id="viewport-legend">
+              <div class="legend-header">
+                <span class="legend-title">Legend</span>
+                <button class="legend-collapse-btn" id="legend-collapse-btn" title="Toggle Legend">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                </button>
               </div>
-              <div class="sim-meter-bar">
-                <div class="sim-meter-fill" id="inc-cache-sim-fill" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. Dry Run Verification Card -->
-          <div class="diagnostic-card card-dryrun">
-            <div class="diag-header">
-              <span class="diag-icon">🧪</span>
-              <span class="diag-title">Live World Dry Run</span>
-              <span class="diag-badge amber" id="inc-dryrun-badge">Ran</span>
-            </div>
-            <div class="diag-content" id="inc-dryrun-text">Dry run verification results...</div>
-          </div>
-
-          <!-- 4. LLM Strategist Card -->
-          <div class="diagnostic-card card-llm">
-            <div class="diag-header">
-              <span class="diag-icon">🧠</span>
-              <span class="diag-title">LLM Multi-Agent Strategist</span>
-              <span class="diag-badge pink" id="inc-llm-badge">GPT-4o / Ollama</span>
-            </div>
-            <div class="diag-content" id="inc-llm-text">LLM directive overview...</div>
-            <div class="meta-pills-row" id="inc-llm-meta-row">
-              <span class="meta-pill" id="inc-llm-latency">⚡ -- ms</span>
-              <span class="meta-pill" id="inc-llm-tokens">🎟️ -- tokens</span>
-              <span class="meta-pill solver-highlight" id="inc-llm-solver">Solver: LNS</span>
-            </div>
-            <div class="code-block-wrap">
-              <div class="code-header">
-                <span>DIRECTIVE PAYLOAD</span>
-                <button class="copy-btn" id="copy-directive-btn">Copy</button>
-              </div>
-              <pre class="code-snippet" id="inc-llm-directive"></pre>
-            </div>
-          </div>
-
-          <!-- 5. Solver Execution Card -->
-          <div class="diagnostic-card card-solver">
-            <div class="diag-header">
-              <span class="diag-icon">⚙️</span>
-              <span class="diag-title">Multi-Agent Path Solver</span>
-              <span class="diag-badge green" id="inc-solver-badge">PIBT / LNS / PBS</span>
-            </div>
-            <div class="diag-content" id="inc-solver-text">Planning trajectory paths...</div>
-          </div>
-
-          <!-- 6. Deterministic Validator Card -->
-          <div class="diagnostic-card card-validator">
-            <div class="diag-header">
-              <span class="diag-icon">🛡️</span>
-              <span class="diag-title">Ground-Truth Validator</span>
-              <span class="diag-badge green" id="inc-validator-badge">Verified ✓</span>
-            </div>
-            <div class="diag-content" id="inc-validator-text">Validation verification proofs...</div>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Bottom Timeline & Playback Dock -->
-      <footer class="bottom-bar">
-        <div class="dock-container glass-panel interactive">
-          <!-- Timeline Slider & Incident Markers -->
-          <div class="timeline-scrub-section">
-            <div class="scrub-meta-row">
-              <div class="scrub-title-row">
-                <span class="clock-icon">⏱️</span>
-                <span class="step-indicator" id="step-indicator">Step 0 / 300</span>
-                <span class="step-progress-pct" id="step-pct">(0%)</span>
-              </div>
-              <div class="incident-counter-chip" id="incident-counter-chip">
-                <span>6 Incidents Logged</span>
+              <div class="legend-items-list" id="legend-items-body">
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-dot normal"></span></div><span>Robot (normal)</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-dot selected"></span></div><span>Selected robot</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-dot goal"></span></div><span>Goal / Destination</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-line orig"></span></div><span>Original path</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-line inval"></span></div><span>Invalidated path</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-line repaired"></span></div><span>Repaired path</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-rect blocked"></span></div><span>Blocked cell (dynamic)</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-rect shelf"></span></div><span>Static obstacle (shelf)</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-dot delayed"></span></div><span>Robot delayed</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-dot emergency"></span></div><span>Robot emergency hold</span></div>
+                <div class="legend-item-row"><div class="legend-indicator"><span class="leg-rect incident"></span></div><span>Incident area</span></div>
               </div>
             </div>
 
-            <div class="slider-track-wrap">
-              <div class="timeline-ticks" id="timeline-ticks"></div>
-              <div class="slider-progress-bar" id="slider-progress-bar"></div>
-              <input type="range" id="step-slider" min="0" max="299" value="0" step="1" />
-            </div>
-          </div>
-
-          <!-- Primary Control Deck -->
-          <div class="playback-controls-deck">
-            <div class="deck-left">
-              <!-- Play / Pause -->
-              <button class="play-btn-primary" id="play-pause-btn">
-                <span class="play-icon" id="play-icon">&#9654;</span>
-                <span id="play-text">Play</span>
+            <!-- In-Viewport Camera Controls Bar (Top-Right) -->
+            <div class="viewport-camera-bar" id="viewport-camera-bar">
+              <button class="cam-preset-btn active" id="btn-cam-full" data-cam="full" title="Fit Complete Warehouse (Key 1)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                Full Warehouse
               </button>
-              <!-- Step frame buttons -->
-              <button class="ctrl-icon-btn" id="step-back-btn" title="Step Back 1 Frame (←)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+              <button class="cam-preset-btn" id="btn-cam-robot" data-cam="robot" title="Center Selected Robot & Surroundings (Key 2)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                Focus on Robot
               </button>
-              <button class="ctrl-icon-btn" id="step-fwd-btn" title="Step Forward 1 Frame (→)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+              <button class="cam-preset-btn" id="btn-cam-incident" data-cam="incident" title="Frame Affected Incident & Routes (Key 3)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                Focus on Incident
               </button>
-
-              <div class="divider-v"></div>
-
-              <!-- Incident Jumper Buttons -->
-              <button class="inc-jump-btn" id="prev-inc-btn" title="Previous Incident (P)">
-                <span class="kbd">P</span> Prev Incident
-              </button>
-              <button class="inc-jump-btn" id="next-inc-btn" title="Next Incident (N)">
-                Next Incident <span class="kbd">N</span>
+              <button class="cam-preset-btn" id="btn-cam-reset" data-cam="reset" title="Reset View (Key 0)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>
+                Reset View
               </button>
             </div>
 
-            <!-- Right Controls: Speed and Loop -->
-            <div class="deck-right">
-              <span class="speed-label">Playback:</span>
-              <div class="speed-pill-group">
-                <button class="speed-btn" data-speed="0.5">0.5x</button>
-                <button class="speed-btn active" data-speed="1">1x</button>
-                <button class="speed-btn" data-speed="2">2x</button>
-                <button class="speed-btn" data-speed="4">4x</button>
+            <!-- Screen-Space 3D Projected Robot Callout Card -->
+            <div id="callout-robot" class="callout-robot-card" style="display: none;">
+              <div class="callout-header">
+                <span class="callout-title" id="callout-robot-id">R12</span>
+                <span class="callout-tag">Selected</span>
+              </div>
+              <div class="callout-row"><span>Position</span><span class="val" id="callout-robot-pos">(5, 8)</span></div>
+              <div class="callout-row"><span>Destination</span><span class="val" id="callout-robot-dest">(18, 2)</span></div>
+              <div class="callout-row">
+                <span>State</span>
+                <span class="state-badge moving" id="callout-robot-state">moving</span>
+              </div>
+              <div class="callout-row"><span>Next Step</span><span class="val" id="callout-robot-next">(5, 9)</span></div>
+            </div>
+
+            <!-- Screen-Space 3D Projected Dynamic Blockage Callout Banner -->
+            <div id="callout-incident" class="callout-incident-badge" style="display: none;">
+              <span id="callout-inc-title">⚠️ Aisle Blockage</span>
+              <span class="sub" id="callout-inc-sub">(3 cells) • t = 15 - 35</span>
+            </div>
+          </div>
+
+          <!-- Lower Middle Row: Incidents Panel + Playback & Timeline -->
+          <div class="middle-controls-row">
+            <!-- Incidents Panel (Bottom-Left) -->
+            <div class="incidents-card" id="incidents-panel">
+              <div class="panel-title-bar">
+                <span class="panel-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  Incidents
+                </span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="panel-badge" id="incidents-badge-count">2</span>
+                  <button class="panel-collapse-btn" id="incidents-collapse-btn" title="Toggle Incidents List">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="incidents-scroll-list" id="incidents-list-container">
+                <!-- Populated dynamically from replay incidents -->
               </div>
             </div>
+
+            <!-- Playback Controls & Multi-Track Timeline (Bottom-Center) -->
+            <div class="playback-timeline-panel">
+              <!-- Top Row: Playback Bar -->
+              <div class="playback-bar-row">
+                <div class="playback-buttons-deck">
+                  <button class="ctrl-btn" id="jump-start-btn" title="Jump to Beginning (Home)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="5" x2="5" y2="19"></line><polygon points="19 19 9 12 19 5 19 19"></polygon></svg>
+                  </button>
+                  <button class="play-btn-main" id="play-pause-btn" title="Toggle Play / Pause (Space)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" id="play-icon-svg"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  </button>
+                  <button class="ctrl-btn" id="step-back-btn" title="Step Back 1 Frame (←)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                  </button>
+                  <button class="ctrl-btn" id="step-fwd-btn" title="Step Forward 1 Frame (→)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                  </button>
+                  <button class="ctrl-btn" id="jump-end-btn" title="Jump to End (End)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 5 15 12 5 19 5 5"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                  </button>
+                </div>
+
+                <div class="timestep-readout">
+                  <span>Timestep:</span>
+                  <span id="timestep-display">23 / 60</span>
+                </div>
+
+                <input type="range" class="timeline-scrubber-slider" id="step-slider" min="0" max="59" value="0" step="1" />
+
+                <div class="playback-options-group">
+                  <select class="speed-select" id="speed-select">
+                    <option value="0.5">0.5x</option>
+                    <option value="1.0" selected>1.0x</option>
+                    <option value="2.0">2.0x</option>
+                    <option value="5.0">5.0x</option>
+                  </select>
+
+                  <button class="inc-nav-btn" id="prev-inc-btn" title="Previous Incident (P)">
+                    &lt; Previous Incident
+                  </button>
+                  <button class="inc-nav-btn" id="next-inc-btn" title="Next Incident (N)">
+                    Next Incident &gt;
+                  </button>
+                </div>
+              </div>
+
+              <!-- Multi-Track Timeline -->
+              <div class="multitrack-timeline-container" id="timeline-container">
+                <div class="timeline-playhead-line" id="timeline-playhead" style="left: 90px;"></div>
+
+                <!-- Track 1: Incidents -->
+                <div class="timeline-track-row">
+                  <span class="track-label">Incidents</span>
+                  <div class="track-viewport" id="track-incidents-viewport">
+                    <!-- Colored event pill blocks injected here -->
+                  </div>
+                </div>
+
+                <!-- Track 2: Robot States -->
+                <div class="timeline-track-row">
+                  <span class="track-label">Robot States</span>
+                  <div class="track-viewport" id="track-states-viewport">
+                    <!-- State event indicators injected here -->
+                  </div>
+                </div>
+
+                <!-- Timestep axis ticks -->
+                <div class="timeline-axis-ticks" id="timeline-axis-ticks">
+                  <span>0</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span><span>60</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Stage Right Column: Robot Details & View Controls -->
+        <aside class="sidebar-panel">
+          <!-- Robot Details Card -->
+          <div class="details-card" id="robot-details-card">
+            <div class="details-header">
+              <div class="details-title-row">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" color="#3185FF"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                <span class="details-id" id="detail-robot-id">R12</span>
+                <span class="details-tag-badge">Selected</span>
+              </div>
+              <button class="details-close-btn" id="detail-close-btn" title="Close Panel (Esc)">&times;</button>
+            </div>
+
+            <!-- Key-Value Information Grid -->
+            <div class="details-data-grid">
+              <div class="data-row-item">
+                <span class="data-label">Current Position</span>
+                <span class="data-value" id="detail-pos">(5, 8)</span>
+              </div>
+              <div class="data-row-item">
+                <span class="data-label">Destination</span>
+                <span class="data-value" id="detail-dest">(18, 2)</span>
+              </div>
+              <div class="data-row-item">
+                <span class="data-label">State</span>
+                <span class="data-value"><span class="state-badge moving" id="detail-state">moving</span></span>
+              </div>
+              <div class="data-row-item">
+                <span class="data-label">Current Timestep</span>
+                <span class="data-value" id="detail-timestep">23 / 60</span>
+              </div>
+              <div class="data-row-item">
+                <span class="data-label">Route Status</span>
+                <span class="data-value" id="detail-route-status">Normal</span>
+              </div>
+              <div class="data-row-item">
+                <span class="data-label">Assigned Incident</span>
+                <span class="data-value link" id="detail-incident">Incident #1</span>
+              </div>
+            </div>
+
+            <!-- Routes Section with Step Counts -->
+            <div class="routes-section">
+              <span class="routes-title">Routes</span>
+              
+              <div class="route-row-item">
+                <div class="route-row-left">
+                  <button class="route-vis-btn" title="Toggle Original Route Visibility">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+                  <span class="route-line-sample orig"></span>
+                  <span>Original Path</span>
+                </div>
+                <span class="route-steps-count" id="detail-orig-steps">24 steps</span>
+              </div>
+
+              <div class="route-row-item">
+                <div class="route-row-left">
+                  <button class="route-vis-btn" title="Toggle Invalidated Route Visibility">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+                  <span class="route-line-sample inval"></span>
+                  <span>Invalidated Path</span>
+                </div>
+                <span class="route-steps-count" id="detail-inval-steps">8 steps</span>
+              </div>
+
+              <div class="route-row-item">
+                <div class="route-row-left">
+                  <button class="route-vis-btn" title="Toggle Repaired Route Visibility">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+                  <span class="route-line-sample repaired"></span>
+                  <span>Repaired Path</span>
+                </div>
+                <span class="route-steps-count" id="detail-repaired-steps">26 steps</span>
+              </div>
+            </div>
+
+            <!-- Focus Camera Action Buttons -->
+            <div style="display: flex; gap: 6px; margin: 8px 0 6px 0;">
+              <button class="btn-focus-cam" id="btn-focus-robot" style="flex: 1;" title="Center camera on selected robot">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>
+                Focus on Robot
+              </button>
+              <button class="btn-focus-cam" id="btn-focus-inc-sidebar" style="flex: 1;" title="Center camera on associated incident">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                Focus on Incident
+              </button>
+            </div>
+
+            <!-- 2D Canvas Route Preview (Top View) -->
+            <div class="route-preview-container">
+              <span class="preview-title">Route Preview (Top View)</span>
+              <canvas id="route-preview-canvas" width="280" height="105"></canvas>
+            </div>
+          </div>
+
+          <!-- View Controls Card -->
+          <div class="view-controls-card">
+            <span class="view-controls-title">View Controls</span>
+
+            <label class="toggle-switch-row">
+              <span>Show All Routes</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-all-routes">
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Only Selected Route</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-selected-route" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Original Routes</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-orig-routes" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Repaired Routes</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-repaired-routes" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Blocked Cells</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-blocked-cells" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Robot IDs</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-robot-ids" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <label class="toggle-switch-row">
+              <span>Show Destinations</span>
+              <div class="switch-control">
+                <input type="checkbox" id="switch-destinations" checked>
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+
+            <button class="btn-reset-view" id="btn-reset-view-sidebar">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path></svg>
+              Reset View
+            </button>
+          </div>
+        </aside>
+      </main>
+
+      <!-- 3. BOTTOM SIMULATION METRICS BAR -->
+      <footer class="metrics-footer-bar">
+        <div class="footer-metric-card green">
+          <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="metric-meta">
+            <span class="lbl">Repair Success Rate</span>
+            <span class="val" id="metric-success-rate">100.0%</span>
+          </div>
+        </div>
+
+        <div class="footer-metric-card blue">
+          <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div class="metric-meta">
+            <span class="lbl">Mean Recovery Steps</span>
+            <span class="val" id="metric-recovery-steps">20.0</span>
+          </div>
+        </div>
+
+        <div class="footer-metric-card cyan">
+          <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+          </div>
+          <div class="metric-meta">
+            <span class="lbl">Cache Hit Rate</span>
+            <span class="val" id="metric-cache-rate">100.0%</span>
+          </div>
+        </div>
+
+        <div class="footer-metric-card purple">
+          <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+          </div>
+          <div class="metric-meta">
+            <span class="lbl">LLM Calls</span>
+            <span class="val" id="metric-llm-calls">0</span>
+          </div>
+        </div>
+
+        <div class="footer-metric-card red">
+          <div class="icon-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div class="metric-meta">
+            <span class="lbl">Safety Violations</span>
+            <span class="val" id="metric-safety-violations">0</span>
           </div>
         </div>
       </footer>
-    </div>
 
-    <!-- Incident Hover Tooltip -->
-    <div id="incident-tooltip" class="incident-tooltip glass-panel hidden">
-      <div class="tooltip-header" id="tt-header">Incident inc_001</div>
-      <div class="tooltip-body" id="tt-body">Blocked cell at step 35</div>
-      <div class="tooltip-hint">Click to jump & inspect</div>
-    </div>
-
-    <!-- Help Modal: Shortcuts & Legend -->
-    <div id="help-modal" class="modal-backdrop hidden">
-      <div class="modal-card glass-panel interactive">
-        <div class="modal-header">
-          <div class="modal-title">System Guide & Hotkeys</div>
-          <button class="card-close-btn" id="help-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="guide-section">
-            <div class="section-title">Robot LED Status Telemetry</div>
-            <div class="legend-grid">
-              <div class="legend-item"><span class="legend-dot" style="background:#38bdf8;"></span><span>Moving (Cyan)</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span><span>Idle / At Goal (Green)</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span><span>Delayed (Amber Pulse 1Hz)</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span><span>Failed / Immobile (Red)</span></div>
-              <div class="legend-item"><span class="legend-dot" style="background:#d946ef;"></span><span>Replanning Path (Magenta)</span></div>
-            </div>
-          </div>
-
-          <div class="guide-section" style="margin-top: 14px;">
-            <div class="section-title">Warehouse Disruption Overlays</div>
-            <div class="legend-grid">
-              <div class="legend-item"><span class="legend-badge-rect red"></span><span>Blocked Cell (Traffic Cone)</span></div>
-              <div class="legend-item"><span class="legend-badge-ring grey"></span><span>Failed Robot Ring Decal</span></div>
-              <div class="legend-item"><span class="legend-badge-rect amber"></span><span>Congestion Region Bound</span></div>
-              <div class="legend-item"><span class="legend-line red-dash"></span><span>Invalidated Old Path (Dashed)</span></div>
-              <div class="legend-item"><span class="legend-line cyan-solid"></span><span>Repaired Plan Path (Solid)</span></div>
-              <div class="legend-item"><span class="legend-line magenta-dash"></span><span>Interacting Incident Link</span></div>
-            </div>
-          </div>
-
-          <div class="guide-section" style="margin-top: 14px;">
-            <div class="section-title">Keyboard Navigation Hotkeys</div>
-            <div class="hotkeys-table">
-              <div class="hotkey-row"><span class="kbd">Space</span><span>Toggle Play / Pause simulation</span></div>
-              <div class="hotkey-row"><span class="kbd">1</span><span>Camera Preset: Whole Warehouse Map</span></div>
-              <div class="hotkey-row"><span class="kbd">2</span><span>Camera Preset: 45° Aisle Perspective</span></div>
-              <div class="hotkey-row"><span class="kbd">3</span><span>Camera Preset: Follow Selected Robot</span></div>
-              <div class="hotkey-row"><span class="kbd">N</span><span>Jump to Next Disruption Incident</span></div>
-              <div class="hotkey-row"><span class="kbd">P</span><span>Jump to Previous Disruption Incident</span></div>
-              <div class="hotkey-row"><span class="kbd">←</span> / <span class="kbd">→</span><span>Single-step frame rewind / forward</span></div>
-              <div class="hotkey-row"><span class="kbd">Click AMR</span><span>Inspect robot telemetry & coordinates</span></div>
-            </div>
-          </div>
-        </div>
+      <!-- Center Floating Toast Notice -->
+      <div id="toast-notification" class="toast-notice hidden">
+        <span id="toast-title" style="font-weight:700;">Notice</span>
+        <span id="toast-desc" style="color:var(--text-secondary);">Action completed</span>
       </div>
     </div>
 

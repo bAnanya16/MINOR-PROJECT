@@ -22,17 +22,57 @@
     },
     "directive": {
       "robots": [
-        0,
-        2
+        12,
+        17
       ],
-      "solver": "lns",
+      "solver": "pibt",
       "priority": [
-        0,
-        2
+        12,
+        17
       ],
-      "horizon": 20,
-      "rationale": "Congested area; chosen LNS for neighborhood trajectory repair."
+      "horizon": 15,
+      "rationale": "Small incident with low congestion and no interactions. PIBT is sufficient for fast, efficient resolution of minor disruptions."
     },
-    "outcome": {}
+    "outcome": {},
+    "last_accessed": 1793036927.98109,
+    "access_count": 8
+  },
+  {
+    "incident_id": "inc_001",
+    "hard_filter_key": "robot_failure|small|low",
+    "features": [
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.20000000298023224,
+      0.0,
+      0.0
+    ],
+    "incident_summary": {
+      "affected_count": 2,
+      "congestion_level": "low"
+    },
+    "directive": {
+      "robots": [
+        10,
+        16
+      ],
+      "solver": "pibt",
+      "priority": [
+        10,
+        16
+      ],
+      "horizon": 10,
+      "rationale": "Low congestion and small incident size favor fast pibt resolution. Robot 10 failed, so it gets highest priority."
+    },
+    "outcome": {},
+    "last_accessed": 1793036927.6467369,
+    "access_count": 13
   }
 ]

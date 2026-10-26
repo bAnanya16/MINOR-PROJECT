@@ -1,0 +1,19 @@
+% Benchmark Comparative Results for Disruption-Aware Path Repair in Lifelong AMR Routing
+\begin{table*}[t]
+\centering
+\small
+\caption{Quantitative comparison of adaptive LLM repair against classical baselines and ablations across warehouse disruption scenarios.}
+\label{tab:mapf_benchmark_results}
+\begin{tabular}{llcccccccc}
+\hline
+\textbf{Strategy / Condition} & \textbf{Overlap} & \textbf{Success (\%)} & \textbf{Recovery} & \textbf{Cost $\Delta$ (\%)} & \textbf{LLM Calls} & \textbf{Hit Rate (\%)} & \textbf{Reuse (\%)} & \textbf{Latency (ms)} & \textbf{Safety Violations} \\
+\hline
+Proposed\_Framework & same_aisle & 100.0 & 17.5 & +6.0 & 1.0 & 50.0 & 50.0 & 1190.5 & 0.0 \\
+Fixed\_PIBT & same_aisle & 100.0 & 20.0 & +0.0 & 0.0 & 0.0 & 0.0 & 0.2 & 0.0 \\
+Fixed\_PBS & same_aisle & 100.0 & 20.0 & +0.0 & 0.0 & 0.0 & 0.0 & 0.3 & 0.0 \\
+Ablation\_NoCache & same_aisle & 100.0 & 17.5 & +6.0 & 2.0 & 0.0 & 0.0 & 2317.7 & 0.0 \\
+Ablation\_Thresh\_070 & same_aisle & 100.0 & 17.5 & +6.0 & 1.0 & 50.0 & 50.0 & 1138.0 & 0.0 \\
+Ablation\_Thresh\_095 & same_aisle & 100.0 & 17.5 & +6.0 & 1.0 & 50.0 & 50.0 & 1246.3 & 0.0 \\
+\hline
+\end{tabular}
+\end{table*}

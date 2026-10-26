@@ -11,6 +11,8 @@ from amr_repair.llm.schema import Directive
 from amr_repair.cache.negative import NegativeMemory, get_hard_filter_key
 
 
+import time
+
 class CacheEntry:
     def __init__(
         self,
@@ -20,6 +22,8 @@ class CacheEntry:
         incident_summary: dict,
         directive: Directive,
         outcome: dict,
+        last_accessed: float = 0.0,
+        access_count: int = 1,
     ):
         self.incident_id = incident_id
         self.hard_filter_key = hard_filter_key
@@ -27,6 +31,8 @@ class CacheEntry:
         self.incident_summary = incident_summary
         self.directive = directive
         self.outcome = outcome
+        self.last_accessed = last_accessed if last_accessed > 0.0 else time.time()
+        self.access_count = access_count
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +42,8 @@ class CacheEntry:
             "incident_summary": self.incident_summary,
             "directive": self.directive.model_dump(),
             "outcome": self.outcome,
+            "last_accessed": self.last_accessed,
+            "access_count": self.access_count,
         }
 
     @classmethod
@@ -47,22 +55,37 @@ class CacheEntry:
             incident_summary=data.get("incident_summary", {}),
             directive=Directive.model_validate(data["directive"]),
             outcome=data.get("outcome", {}),
+            last_accessed=data.get("last_accessed", 0.0),
+            access_count=data.get("access_count", 1),
         )
 
 
 class StrategyCache:
-    """Stores verified repair strategies and retrieves them via hard filtering + cosine similarity."""
+    """Stores verified repair strategies and retrieves them via hard filtering + cosine similarity,
+    governed by configurable capacity limits and an LRU eviction policy.
+    """
 
     def __init__(
         self,
         threshold: float = 0.85,
+        max_capacity: int = 500,
         negative_memory: Optional[NegativeMemory] = None,
         filepath: Optional[str] = None,
     ):
         self.threshold = threshold
+        self.max_capacity = max(1, max_capacity)
         self.negative_memory = negative_memory or NegativeMemory()
         self.filepath = filepath
         self.entries: List[CacheEntry] = []
+
+        # Telemetry counters
+        self.lookups: int = 0
+        self.hits: int = 0
+        self.misses: int = 0
+        self.insertions: int = 0
+        self.updates: int = 0
+        self.evictions: int = 0
+        self.verified_reuses: int = 0
 
         if self.filepath and os.path.exists(self.filepath):
             self.load(self.filepath)
@@ -73,13 +96,17 @@ class StrategyCache:
         """Find best matching directive above threshold that is not in negative memory.
         Returns: (Directive, matched_incident_id, similarity) or None.
         """
+        self.lookups += 1
+
         if self.threshold >= 1.0 or not self.entries:
+            self.misses += 1
             return None
 
         target_key = get_hard_filter_key(incident)
         # 1. Hard filter on disruption types, size bucket, and congestion level
         candidates = [e for e in self.entries if e.hard_filter_key == target_key]
         if not candidates:
+            self.misses += 1
             return None
 
         # 2. Cosine similarity on features
@@ -110,9 +137,24 @@ class StrategyCache:
             if self.negative_memory.contains(incident, adapted_directive):
                 continue
 
+            # Update entry recency
+            entry.last_accessed = time.time()
+            entry.access_count += 1
+            self.hits += 1
+
             return adapted_directive, entry.incident_id, sim
 
+        self.misses += 1
         return None
+
+    def record_verified_reuse(self, incident_id: str) -> None:
+        """Called when a dry run succeeds, confirming verified reuse of the cached directive."""
+        self.verified_reuses += 1
+        for e in self.entries:
+            if e.incident_id == incident_id:
+                e.last_accessed = time.time()
+                e.access_count += 1
+                break
 
     def store(
         self,
@@ -120,8 +162,27 @@ class StrategyCache:
         directive: Directive,
         outcome: Optional[dict] = None,
     ) -> None:
-        """Store a verified directive into the cache."""
+        """Store a verified directive into the cache, evicting the least recently used entry if full."""
         key = get_hard_filter_key(incident)
+
+        # Update if an entry with the exact same incident ID already exists
+        for e in self.entries:
+            if e.incident_id == incident.id:
+                e.directive = directive
+                e.outcome = outcome or e.outcome
+                e.last_accessed = time.time()
+                e.access_count += 1
+                self.updates += 1
+                if self.filepath:
+                    self.save(self.filepath)
+                return
+
+        # Capacity management: Evict LRU if capacity exceeded
+        while len(self.entries) >= self.max_capacity:
+            oldest_idx = min(range(len(self.entries)), key=lambda i: self.entries[i].last_accessed)
+            self.entries.pop(oldest_idx)
+            self.evictions += 1
+
         entry = CacheEntry(
             incident_id=incident.id,
             hard_filter_key=key,
@@ -132,8 +193,11 @@ class StrategyCache:
             },
             directive=directive,
             outcome=outcome or {},
+            last_accessed=time.time(),
+            access_count=1,
         )
         self.entries.append(entry)
+        self.insertions += 1
 
         if self.filepath:
             self.save(self.filepath)
