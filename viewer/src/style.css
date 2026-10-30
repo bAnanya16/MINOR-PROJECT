@@ -271,6 +271,16 @@ body, html {
   overflow: hidden;
 }
 
+.viewport-card:fullscreen,
+.viewport-card:-webkit-full-screen,
+.viewport-card.is-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  z-index: 999999 !important;
+}
+
 #canvas-container {
   width: 100%;
   height: 100%;
@@ -373,7 +383,7 @@ body, html {
 }
 
 .leg-rect.blocked { background: var(--cell-blocked); }
-.leg-rect.shelf { background: #6B4E32; }
+.leg-rect.shelf { background: #181a1d; border: 1px solid #3b4252; }
 .leg-rect.incident { border: 1px solid var(--cell-blocked); background: rgba(240, 79, 85, 0.25); }
 
 .leg-line {
@@ -424,6 +434,37 @@ body, html {
 .cam-preset-btn.active {
   background: var(--accent-primary);
   color: #fff;
+}
+
+/* In-Viewport Navigation Hint Badge (Bottom-Right) */
+.viewport-nav-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(13, 24, 36, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 10;
+  user-select: none;
+}
+
+.viewport-nav-hint kbd {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-right: 4px;
 }
 
 /* In-Viewport 3D Callout Tooltips (Positioned dynamically in screen space) */
